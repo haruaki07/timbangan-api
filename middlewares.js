@@ -23,6 +23,7 @@ function errorHandler(err, _req, res, next) {
     body.statusCode = 400
     body.error = "Bad Request"
     body.validation = err.format()
+    body.message = "Invalid request body"
   }
 
   if (body.statusCode >= 500) {
