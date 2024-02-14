@@ -5,7 +5,6 @@ const middlewares = require("./middlewares")
 const Boom = require("@hapi/boom")
 const bcrypt = require("@node-rs/bcrypt")
 const jwt = require("jsonwebtoken")
-const { expressjwt } = require("express-jwt")
 
 const db = createConnectionPool({
   connectionString:
@@ -108,6 +107,72 @@ api.get("/auth/me", middlewares.auth, async (req, res, next) => {
     `)
 
     res.json(user)
+  } catch (e) {
+    next(e)
+  }
+})
+
+api.post("/profile", middlewares.auth, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        name: z.string().max(100).optional(),
+      })
+      .parse(req.body)
+
+    const { uid } = req.auth
+
+    const exist = await db.query(sql`SELECT id FROM users WHERE id = ${uid}`)
+    if (exist < 1) {
+      throw new Boom.notFound("User not found!")
+    }
+
+    const user = await db.tx(async (tx) => {
+      const fields = Object.entries(body).map(
+        ([k, v]) => sql`${sql.ident(k)} = ${v}`
+      )
+
+      if (fields.length > 0) {
+        await tx.query(
+          sql`UPDATE users SET ${sql.join(fields)} WHERE id = ${uid}`
+        )
+      }
+
+      const [user] = await tx.query(sql`
+        SELECT id, name, email, phone_number, created_at, updated_at 
+        FROM users
+        WHERE id = ${uid}
+      `)
+
+      return user
+    })
+
+    res.json(user)
+  } catch (e) {
+    next(e)
+  }
+})
+
+api.post("/profile/password", middlewares.auth, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        password: z.string().min(6),
+      })
+      .parse(req.body)
+
+    const { uid } = req.auth
+
+    const exist = await db.query(sql`SELECT id FROM users WHERE id = ${uid}`)
+    if (exist < 1) {
+      throw new Boom.notFound("User not found!")
+    }
+
+    const hash = await bcrypt.hash(body.password)
+
+    await db.query(sql`UPDATE users SET password = ${hash} WHERE id = ${uid}`)
+
+    res.sendStatus(204)
   } catch (e) {
     next(e)
   }
