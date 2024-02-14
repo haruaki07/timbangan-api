@@ -178,6 +178,147 @@ api.post("/profile/password", middlewares.auth, async (req, res, next) => {
   }
 })
 
+api.get("/children", middlewares.auth, async (req, res, next) => {
+  try {
+    const { uid } = req.auth
+
+    const exist = await db.query(sql`SELECT id FROM users WHERE id = ${uid}`)
+    if (exist < 1) {
+      throw new Boom.notFound("User not found!")
+    }
+
+    const children = await db.query(
+      sql`SELECT name, birth_date FROM children WHERE parent_id = ${uid}`
+    )
+
+    res.json(children)
+  } catch (e) {
+    next(e)
+  }
+})
+
+api.post("/children", middlewares.auth, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        name: z.string().max(100),
+        birth_date: z.string().pipe(z.coerce.date()).optional().default(null),
+        birth_place: z.string().optional().default(null),
+      })
+      .parse(req.body)
+
+    const { uid } = req.auth
+
+    const exist = await db.query(sql`SELECT id FROM users WHERE id = ${uid}`)
+    if (exist < 1) {
+      throw new Boom.notFound("User not found!")
+    }
+
+    const result = await db.query(sql`
+      INSERT INTO children (name, birth_date, birth_place, parent_id)
+      VALUES (${body.name}, ${body.birth_date}, ${body.birth_place}, ${uid})
+    `)
+
+    const [child] = await db.query(sql`
+      SELECT id, name, birth_date, birth_place, created_at, updated_at
+      FROM children WHERE id = ${result.insertId}
+    `)
+
+    res.json(child)
+  } catch (e) {
+    next(e)
+  }
+})
+
+api.get("/children/:id", middlewares.auth, async (req, res, next) => {
+  try {
+    const { uid } = req.auth
+    const { id } = req.params
+
+    const [child] = await db.query(
+      sql`SELECT * FROM children WHERE id = ${id} AND parent_id = ${uid}`
+    )
+    if (!child) {
+      throw new Boom.notFound("Child not found!")
+    }
+
+    const [parent] = await db.query(
+      sql`SELECT name FROM users WHERE id = ${child.parent_id}`
+    )
+    child.parent = parent ?? null
+
+    res.json(child)
+  } catch (e) {
+    next(e)
+  }
+})
+
+api.post("/children/:id", middlewares.auth, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        name: z.string().max(100).optional(),
+        birth_date: z.string().pipe(z.coerce.date()).optional(),
+        birth_place: z.string().optional(),
+        weight: z.number().min(0).optional(),
+        length: z.number().min(0).optional(),
+        weight_recorded_at: z.string().pipe(z.coerce.date()).optional(),
+      })
+      .parse(req.body)
+
+    const { uid } = req.auth
+    const { id } = req.params
+
+    const exist = await db.query(
+      sql`SELECT id FROM children WHERE id = ${id} AND parent_id = ${uid}`
+    )
+    if (exist < 1) {
+      throw new Boom.notFound("Child not found!")
+    }
+
+    const child = await db.tx(async (tx) => {
+      const fields = Object.entries(body).map(
+        ([k, v]) => sql`${sql.ident(k)} = ${v}`
+      )
+
+      if (fields.length > 0) {
+        await tx.query(
+          sql`UPDATE children SET ${sql.join(fields, ",")} WHERE id = ${id}`
+        )
+      }
+
+      const [child] = await tx.query(
+        sql`SELECT * FROM children WHERE id = ${id}`
+      )
+      return child
+    })
+
+    res.json(child)
+  } catch (e) {
+    next(e)
+  }
+})
+
+api.delete("/children/:id", middlewares.auth, async (req, res, next) => {
+  try {
+    const { uid } = req.auth
+    const { id } = req.params
+
+    const exist = await db.query(
+      sql`SELECT id FROM children WHERE id = ${id} AND parent_id = ${uid}`
+    )
+    if (exist < 1) {
+      throw new Boom.notFound("Child not found!")
+    }
+
+    await db.query(sql`DELETE FROM children WHERE id = ${id}`)
+
+    res.sendStatus(204)
+  } catch (e) {
+    next(e)
+  }
+})
+
 api.use(middlewares.errorHandler)
 
 app.use("/api/v1", api)
