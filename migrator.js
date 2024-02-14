@@ -23,12 +23,8 @@ const umzug = new Umzug({
       return {
         name,
         path,
-        up: async () =>
-          db.query(sql.__dangerous__rawValue(fs.readFileSync(path).toString())),
-        down: async () =>
-          db.query(
-            sql.__dangerous__rawValue(fs.readFileSync(downPath).toString())
-          ),
+        up: async () => db.query(sql.file(path)),
+        down: async () => db.query(sql.file(downPath)),
       }
     },
   },
