@@ -134,7 +134,7 @@ api.post("/profile", middlewares.auth, async (req, res, next) => {
 
       if (fields.length > 0) {
         await tx.query(
-          sql`UPDATE users SET ${sql.join(fields)} WHERE id = ${uid}`
+          sql`UPDATE users SET ${sql.join(fields, ",")} WHERE id = ${uid}`
         )
       }
 
