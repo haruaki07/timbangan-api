@@ -335,12 +335,12 @@ api.post("/record", async (req, res, next) => {
       })
       .parse(req.body)
 
-    await db.query(sql`
+    const result = await db.query(sql`
       INSERT INTO weight_records (box_id, weight, length, recorded_at)
       VALUES (${body.box_id}, ${body.weight}, ${body.length}, ${new Date()})
     `)
 
-    res.sendStatus(204)
+    res.json({ record_id: result.insertId })
   } catch (e) {
     next(e)
   }
@@ -364,9 +364,7 @@ api.post('/record_save', middlewares.auth, async (req, res, next) => {
   try {
     const body = z
       .object({
-        box_id: z.string(),
-        weight: z.number(),
-        length: z.number(),
+        record_id: z.number(),
       })
       .parse(req.body)
 
@@ -377,9 +375,16 @@ api.post('/record_save', middlewares.auth, async (req, res, next) => {
       throw new Boom.badRequest("Child not found!")
     }
 
+    const [record] = await db.query(sql`
+      SELECT * FROM weight_records WHERE id = ${body.record_id}
+    `)
+    if (!record) {
+      throw new Boom.badRequest("Invalid record id!")
+    }
+
     await db.query(sql`
       INSERT INTO records (child_id, box_id, weight, length, recorded_at)
-      VALUES (${child.id}, ${body.box_id}, ${body.weight}, ${body.length}, ${new Date()})
+      VALUES (${child.id}, ${record.box_id}, ${record.weight}, ${record.length}, ${new Date()})
     `)
 
     res.sendStatus(204)

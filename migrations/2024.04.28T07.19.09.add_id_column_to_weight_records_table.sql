@@ -1,0 +1,3 @@
+-- up migration
+ALTER TABLE `weight_records`
+  ADD COLUMN `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY;
