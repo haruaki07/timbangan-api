@@ -340,11 +340,11 @@ api.post("/record", async (req, res, next) => {
       VALUES (${body.box_id}, ${body.weight}, ${body.length}, ${new Date()})
     `)
 
-    res.sendStatus(204);
+    res.sendStatus(204)
   } catch (e) {
-    next(e);
+    next(e)
   }
-});
+})
 
 api.get('/record_latest', async (req, res, next) => {
   try {
@@ -352,11 +352,11 @@ api.get('/record_latest', async (req, res, next) => {
 
     const [record] = await db.query(sql`
       SELECT * FROM weight_records WHERE box_id = ${box_id} ORDER BY recorded_at DESC LIMIT 1
-    `);
+    `)
 
-    res.json(record);
+    res.json(record)
   } catch (e) {
-    next(e);
+    next(e)
   }
 })
 
@@ -364,6 +364,7 @@ api.post('/record_save', middlewares.auth, async (req, res, next) => {
   try {
     const body = z
       .object({
+        box_id: z.string(),
         weight: z.number(),
         length: z.number(),
       })
@@ -371,21 +372,40 @@ api.post('/record_save', middlewares.auth, async (req, res, next) => {
 
     const [child] = await db.query(sql`
       SELECT * FROM children WHERE parent_id = ${req.auth.uid}
-    `);
+    `)
     if (!child) {
       throw new Boom.badRequest("Child not found!")
     }
 
     await db.query(sql`
-      UPDATE children SET weight = ${body.weight}, length = ${body.length}, weight_recorded_at = ${new Date()}
-      WHERE id = ${child.id}
+      INSERT INTO records (child_id, box_id, weight, length, recorded_at)
+      VALUES (${child.id}, ${body.box_id}, ${body.weight}, ${body.length}, ${new Date()})
     `)
 
-    res.sendStatus(204);
+    res.sendStatus(204)
+  } catch (e) {
+    next(e)
+  }
+})
+
+api.get('/records', middlewares.auth, async (req, res, next) => {
+  try {
+    const [child] = await db.query(sql`
+      SELECT id FROM children WHERE parent_id = ${req.auth.uid}
+    `)
+    if (!child) {
+      throw new Boom.badRequest("Child not found!")
+    }
+
+    const result = await db.query(sql`
+      SELECT * FROM records WHERE child_id = ${child.id}
+    `)
+
+    res.json(result);
   } catch (e) {
     next(e);
   }
-});
+})
 
 api.use(middlewares.errorHandler)
 
