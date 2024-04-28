@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: yobasystems/alpine-mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: timbangandb
+      MYSQL_USER: timbangan
+      MYSQL_PASSWORD: timbangan
+    ports:
+      - 3306:3306
+    volumes:
+      - mysql:/var/lib/mysql
+    restart: always
+    networks:
+      - timbangan
+
+networks:
+  timbangan:
+
+volumes:
+  mysql:
