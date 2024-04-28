@@ -31,6 +31,7 @@ api.post("/auth/register", async (req, res, next) => {
     const body = z
       .object({
         name: z.string().max(100),
+        child_name: z.string().max(100),
         phone_number: z.string().max(20),
         email: z.string().email(),
         password: z.string().min(6),
@@ -47,9 +48,14 @@ api.post("/auth/register", async (req, res, next) => {
     const user = await db.tx(async (tx) => {
       const hashed = await bcrypt.hash(body.password)
 
-      await tx.query(sql`
+      const result = await tx.query(sql`
         INSERT INTO users (name, email, password, phone_number)
         VALUES (${body.name}, ${body.email}, ${hashed}, ${body.phone_number})
+      `)
+
+      await tx.query(sql`
+        INSERT INTO children (name, parent_id)
+        VALUES (${body.child_name}, ${result.insertId})
       `)
 
       const [user] = await tx.query(sql`
