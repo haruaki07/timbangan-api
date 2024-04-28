@@ -325,6 +325,68 @@ api.delete("/children/:id", middlewares.auth, async (req, res, next) => {
   }
 })
 
+api.post("/record", async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        box_id: z.string(),
+        weight: z.number(),
+        length: z.number(),
+      })
+      .parse(req.body)
+
+    await db.query(sql`
+      INSERT INTO weight_records (box_id, weight, length, recorded_at)
+      VALUES (${body.box_id}, ${body.weight}, ${body.length}, ${new Date()})
+    `)
+
+    res.sendStatus(204);
+  } catch (e) {
+    next(e);
+  }
+});
+
+api.get('/record_latest', async (req, res, next) => {
+  try {
+    const box_id = req.query.box_id;
+
+    const [record] = await db.query(sql`
+      SELECT * FROM weight_records WHERE box_id = ${box_id} ORDER BY recorded_at DESC LIMIT 1
+    `);
+
+    res.json(record);
+  } catch (e) {
+    next(e);
+  }
+})
+
+api.post('/record_save', middlewares.auth, async (req, res, next) => {
+  try {
+    const body = z
+      .object({
+        weight: z.number(),
+        length: z.number(),
+      })
+      .parse(req.body)
+
+    const [child] = await db.query(sql`
+      SELECT * FROM children WHERE parent_id = ${req.auth.uid}
+    `);
+    if (!child) {
+      throw new Boom.badRequest("Child not found!")
+    }
+
+    await db.query(sql`
+      UPDATE children SET weight = ${body.weight}, length = ${body.length}, weight_recorded_at = ${new Date()}
+      WHERE id = ${child.id}
+    `)
+
+    res.sendStatus(204);
+  } catch (e) {
+    next(e);
+  }
+});
+
 api.use(middlewares.errorHandler)
 
 app.use("/api/v1", api)
